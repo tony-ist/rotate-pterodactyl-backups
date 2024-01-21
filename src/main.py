@@ -1,72 +1,70 @@
 import os
-import urllib.parse
+import shutil
+from datetime import datetime
 
-import requests
 from dotenv import load_dotenv
 
 from src.client import PterodactylClient
 
-ENABLE_BACKUPS_TAG = 'ENABLE_AUTO_BACKUPS'
+
+def copy(file_path: str, destination_file_path: str):
+    shutil.copy(file_path, destination_file_path)
+    print(f"Copied '{file_path}' to '{destination_file_path}'")
+
+
+def rotate_backups(folder_path: str):
+    pass
+
+
+def iso_to_timestamp(timestamp_utc):
+    dt = datetime.fromisoformat(timestamp_utc)
+    return "{:%Y_%m_%d_%H_%M_%S}".format(dt)
 
 
 def main():
     load_dotenv()
 
     api_key = os.environ['API_KEY']
-    pterodactyl_key = os.environ['PTERODACTYL_URL']
+    pterodactyl_url = os.environ['PTERODACTYL_URL']
     pterodactyl_backups_dir = os.environ['PTERODACTYL_BACKUPS_DIR']
-    client = PterodactylClient(api_key, pterodactyl_key, pterodactyl_backups_dir)
+    main_backups_dir = os.environ['MAIN_BACKUPS_DIR']
+    reserve_backups_dir = os.environ['RESERVE_BACKUPS_DIR']
+    client = PterodactylClient(api_key, pterodactyl_url, pterodactyl_backups_dir)
 
     servers_to_backup = client.get_servers_to_backup()
+    print(servers_to_backup)
 
     for server in servers_to_backup:
-        # server_sid is abbreviation of server string id: pterodactyl has internal integer id
-        # and also external string id which is used here
+        # server_sid is abbreviation of server string id. Pterodactyl has two ids:
+        # internal integer id and also string id which is used here and in urls
+        server_sid = server['attributes']['identifier']
+        server_name = server['attributes']['name']
         oldest_backup = client.get_oldest_backup(server_sid)
+        print(oldest_backup)
         if oldest_backup:
-            client.delete_backup(oldest_backup_uuid)
-        backup_uuid = client.make_backup(server_sid)
+            oldest_backup_uuid = oldest_backup['attributes']['uuid']
+            client.delete_backup(server_sid, oldest_backup_uuid)
+            print(f"Deleted old backup '{oldest_backup_uuid}' for server '{server_sid}' with name '{server_name}'")
+        backup_response = client.make_backup(server_sid)
+        backup_json = backup_response.json()
+        backup_uuid = backup_json['attributes']['uuid']
+        print('backup_response.json():', backup_json)
+
+        pterodactyl_backup_path = f"/var/lib/pterodactyl/backups/{backup_uuid}.tar.gz"
+        timestamp_iso = backup_json['attributes']['created_at']
+        timestamp = iso_to_timestamp(timestamp_iso)
+        backup_name_with_timestamp = f"{backup_uuid}_{timestamp}.tar.gz"
+
+        print("backup_name_with_timestamp:", backup_name_with_timestamp)
 
         # Copy the backup to first and second drives
         # In case one of the drives fails we will still have a copy of the backup
-        copy(pterodactyl_backup_path, main_backups_dir)
-        copy(pterodactyl_backup_path, reserve_backups_dir)
+        copy(pterodactyl_backup_path, f"{main_backups_dir}/{backup_name_with_timestamp}")
+        copy(pterodactyl_backup_path, f"{reserve_backups_dir}/{backup_name_with_timestamp}")
 
-    # Delete old backups on both drives so that we do not run out of space # TODO: Move comment to function docstring
+    # Delete old backups on both drives so that we do not run out of space
     rotate_backups(main_backups_dir)
     rotate_backups(reserve_backups_dir)
-
-    backup_id = initiate_backup(options)
-
-    servers_url = urllib.parse.urljoin(pterodactyl_url, '/api/client')
-
-    servers_response = requests.get(servers_url, headers=headers)
-    print(servers_response.text)
-    servers = servers_response.json()['data']
-    print(len(servers))
-
-    servers_to_backup = list(filter(lambda s: ENABLE_BACKUPS_TAG in s['attributes']['description'], servers))
-    print(len(servers_to_backup))
-
-    for server in servers:
-        print(server['attributes']['identifier'])
-
-    server_id = '1d9fa352'
-    backups_url = urllib.parse.urljoin(pterodactyl_url, f'/api/client/servers/{server_id}/backups')
-    backups_response = requests.get(backups_url, headers=headers)
-    print(backups_response.text)
-
-    backup_id = '7f053d09-19e2-4e82-b1f6-432975a81a3b'
-    backup_download_url = urllib.parse.urljoin(pterodactyl_url,
-                                               f'/api/client/servers/{server_id}/backups/{backup_id}/download')
-    backup_download_link_response = requests.get(backup_download_url, headers=headers)
-    backup_download_link = backup_download_link_response.json()['attributes']['url']
-    print(backup_download_link)
-
-    backup_response = requests.get(backup_download_link)
-
-    # with open('files/backup.tar.gz', 'wb') as file:
-    #     file.write(backup_response.content)
 
 
 if __name__ == '__main__':
