@@ -56,7 +56,6 @@ class PterodactylClient:
 
     def get_oldest_backup(self, server_sid: str):
         response = self.get(f'/api/client/servers/{server_sid}/backups')
-        print(response.status_code)
         backup_list = response.json()['data']
 
         if len(backup_list) == 0:
