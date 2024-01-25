@@ -66,7 +66,7 @@ def main():
             backup_details = client.backup_details(server_sid, backup_uuid).json()
             if backup_details['attributes']['completed_at']:
                 break
-            time.sleep(1)
+            time.sleep(3)
 
         pterodactyl_backup_path = f'/var/lib/pterodactyl/backups/{backup_uuid}.tar.gz'
         timestamp_iso = backup_json['attributes']['created_at']
