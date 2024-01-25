@@ -48,6 +48,9 @@ class PterodactylClient:
     def make_backup(self, server_sid: str):
         return self.post(f'/api/client/servers/{server_sid}/backups')
 
+    def backup_details(self, server_sid: str, backup_uuid: str):
+        return self.get(f'/api/client/servers/{server_sid}/backups/{backup_uuid}')
+
     def download_backup(self, backup_uuid: str, save_path: str):
         pass
 

@@ -1,6 +1,8 @@
 import os
 import pathlib
 import shutil
+import time
+
 import rotate_backups as rb
 from datetime import datetime
 
@@ -40,6 +42,8 @@ def main():
 
     servers_to_backup = client.get_servers_to_backup()
 
+    print('Servers to backup:', list(map(lambda server: server['attributes']['name'], servers_to_backup)))
+
     for server in servers_to_backup:
         # server_sid is abbreviation of server string id. Pterodactyl has three server ids:
         # internal integer id `internal_id`, string id `identifier` which is used here
@@ -50,12 +54,21 @@ def main():
         if oldest_backup:
             oldest_backup_uuid = oldest_backup['attributes']['uuid']
             client.delete_backup(server_sid, oldest_backup_uuid)
-            print(f"Deleted old backup '{oldest_backup_uuid}' for server '{server_sid}' with name '{server_name}'")
+            print(f'Deleted old backup "{oldest_backup_uuid}" for server "{server_sid}" with name "{server_name}"')
         backup_response = client.make_backup(server_sid)
         backup_json = backup_response.json()
         backup_uuid = backup_json['attributes']['uuid']
 
-        pterodactyl_backup_path = f"/var/lib/pterodactyl/backups/{backup_uuid}.tar.gz"
+        print(f'Started backup "{backup_uuid}" creation for server "{server_sid}" with name "{server_name}"')
+
+        while True:
+            print(f'Waiting for backup {backup_uuid} completion...')
+            backup_details = client.backup_details(server_sid, backup_uuid).json()
+            if backup_details['attributes']['completed_at']:
+                break
+            time.sleep(1)
+
+        pterodactyl_backup_path = f'/var/lib/pterodactyl/backups/{backup_uuid}.tar.gz'
         timestamp_iso = backup_json['attributes']['created_at']
         timestamp = iso_to_timestamp(timestamp_iso)
         backup_name_with_timestamp = f"{timestamp}_{backup_uuid}.tar.gz"

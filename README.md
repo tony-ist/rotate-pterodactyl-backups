@@ -12,3 +12,4 @@ TODO
 ## TODO
 
 * Read `rotate-backups.ini` configuration file via rotate-backups API
+* Restore backup feature
