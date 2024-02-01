@@ -9,7 +9,7 @@ from src.util import iso_to_timestamp, copy, rotate_backups
 
 
 def main():
-    load_dotenv()
+    load_dotenv(override=True)
 
     api_key = os.environ['API_KEY']
     pterodactyl_url = os.environ['PTERODACTYL_URL']
