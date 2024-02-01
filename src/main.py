@@ -1,32 +1,11 @@
 import os
 import pathlib
-import shutil
 import time
-
-import rotate_backups as rb
-from datetime import datetime
 
 from dotenv import load_dotenv
 
 from src.client import PterodactylClient
-
-
-def copy(file_path: str, destination_file_path: str):
-    shutil.copy(file_path, destination_file_path)
-    print(f"Copied '{file_path}' to '{destination_file_path}'")
-
-
-def rotate_backups(folder_path: str, rotate_backups_config_path: str = "/etc/rotate-backups.ini"):
-    rotator = rb.RotateBackups(rotation_scheme={'daily': 10, 'monthly': 3}, prefer_recent=True)
-    # rotator.load_config_file(rotate_backups_config_path)
-    rotation_commands = rotator.rotate_backups(folder_path)
-    commands_args = list(map(lambda c: c.command, rotation_commands))
-    print(f"Deleted old backups. Rotation commands ({len(rotation_commands)}):", commands_args)
-
-
-def iso_to_timestamp(timestamp_utc):
-    dt = datetime.fromisoformat(timestamp_utc)
-    return "{:%Y_%m_%d_%H_%M_%S}".format(dt)
+from src.util import iso_to_timestamp, copy, rotate_backups
 
 
 def main():
@@ -38,7 +17,7 @@ def main():
     main_backups_dir = os.environ['MAIN_BACKUPS_DIR']
     reserve_backups_dir = os.environ['RESERVE_BACKUPS_DIR']
     # rotate_backups_config_path = os.environ['ROTATE_BACKUPS_CONFIG_PATH']
-    client = PterodactylClient(api_key, pterodactyl_url, pterodactyl_backups_dir)
+    client = PterodactylClient(api_key, pterodactyl_url)
 
     servers_to_backup = client.get_servers_to_backup()
 
@@ -68,7 +47,7 @@ def main():
                 break
             time.sleep(3)
 
-        pterodactyl_backup_path = f'/var/lib/pterodactyl/backups/{backup_uuid}.tar.gz'
+        pterodactyl_backup_path = f'{pterodactyl_backups_dir}/{backup_uuid}.tar.gz'
         timestamp_iso = backup_json['attributes']['created_at']
         timestamp = iso_to_timestamp(timestamp_iso)
         backup_name_with_timestamp = f"{timestamp}_{backup_uuid}.tar.gz"

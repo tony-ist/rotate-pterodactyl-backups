@@ -8,9 +8,8 @@ ENABLE_BACKUPS_TAG = 'ENABLE_AUTO_BACKUPS'
 class PterodactylClient:
     api_key: str
     pterodactyl_url: str
-    backups_dir: str
 
-    def __init__(self, api_key: str, pterodactyl_url: str, backups_dir: str):
+    def __init__(self, api_key: str, pterodactyl_url: str):
         self.api_key = api_key
         self.pterodactyl_url = pterodactyl_url
         self.headers = {
@@ -18,11 +17,10 @@ class PterodactylClient:
             'Accept': 'application/json',
             'Content-Type': 'application/json',
         }
-        self.backups_dir = backups_dir
 
     def request(self, method: str, url: str, payload: dict = None) -> requests.Response:
         full_url = urllib.parse.urljoin(self.pterodactyl_url, url)
-        response = requests.request(method, full_url, headers=self.headers, data=payload)
+        response = requests.request(method, full_url, headers=self.headers, json=payload)
         if not response.ok:
             raise Exception(f'Got response with status code {response.status_code}. Response: {response.text}')
         return response
@@ -30,23 +28,27 @@ class PterodactylClient:
     def get(self, url: str):
         return self.request('GET', url)
 
-    def post(self, url: str):
-        return self.request('POST', url)
+    def post(self, url: str, payload: dict = None):
+        return self.request('POST', url, payload)
 
     def delete(self, url: str):
         return self.request('DELETE', url)
 
-    def get_servers_to_backup(self) -> list[dict]:
+    def get_servers(self) -> list[dict]:
         servers_response = self.get('/api/client')
-        servers = servers_response.json()['data']
+        return servers_response.json()['data']
+
+    def get_servers_to_backup(self) -> list[dict]:
+        servers = self.get_servers()
 
         def has_backups_tag(server: dict) -> bool:
             return ENABLE_BACKUPS_TAG in server['attributes']['description']
 
         return list(filter(has_backups_tag, servers))
 
-    def make_backup(self, server_sid: str):
-        return self.post(f'/api/client/servers/{server_sid}/backups')
+    def make_backup(self, server_sid: str, name: str = None):
+        payload = {'name': name} if name else None
+        return self.post(f'/api/client/servers/{server_sid}/backups', payload)
 
     def backup_details(self, server_sid: str, backup_uuid: str):
         return self.get(f'/api/client/servers/{server_sid}/backups/{backup_uuid}')
